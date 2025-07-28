@@ -1,68 +1,68 @@
-# BalanceAnomalyTrap
-**Balance Anomaly Trap — Drosera Trap SERGEANT** 
-
+# 🔥 hello-world-trap 
+## Core Function  
+```solidity
+function helloworld(string memory message) public pure returns (string memory) {
+    return string(abi.encodePacked("Hello, ", message, "!"));
+}
 # Objective
 
 Create a functional and deployable Drosera trap that:
 
-- Monitors ETH balance anomalies of a specific wallet,
-
-- Uses the standard collect() / shouldRespond() interface,
-
-- Triggers a response when balance deviation exceeds a given threshold (e.g., 1%),
-
-- Integrates with a separate alert contract to handle responses.
+- Monitors ETH balance anomalies of **two operator wallets**,
+- Uses the standard `collect()` / `shouldRespond()` interface,
+- Triggers a response when **any balance deviation is detected**,
+- Returns an alert if either balance has changed since the last check.
 ---
 
 # Problem
 
-Ethereum wallets involved in DAO treasury, DeFi protocol management, or vesting operations must maintain a consistent balance. Any unexpected change — loss or gain — could indicate compromise, human error, or exploit.
+Ethereum operator contracts used in automation, asset routing, DAO management, or protocol operations must remain stable over time.  
+Any untracked movement — deposit or withdrawal — can suggest an exploit, system error, or unintended interference.
 
-Solution: _Monitor ETH balance of a wallet across blocks. Trigger a response if there's a significant deviation in either direction._
+🧩 **Solution**: Track ETH balances of two known operators.  
+Trigger alerts if either operator’s balance has changed._
 
 ---
 
 # Trap Logic Summary
 
-_Trap Contract: BalanceAnomalyTrap.sol_
+_Trap Contract: DRDSER4Trap.sol_
 
-_Pay attention to this string "address public constant target = 0xABcDEF1234567890abCDef1234567890AbcDeF12; // change 0xABcDEF1234567890abCDef1234567890AbcDeF12 to your own wallet address"_
+_Pay attention to this string "address public constant target = 0x2aCEeCC0d79C54569aF451d354498Bb80Efe6C41; // change 0x6a2CB0D4a32F4AB4b8c401307696dA73b430733c to your own wallet address"_
 ```
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 interface ITrap {
-    function collect() external returns (bytes memory);
-    function shouldRespond(bytes[] calldata data) external view returns (bool, bytes memory);
+    function collect() external view returns (bytes memory);
+    function shouldRespond(bytes calldata data) external pure returns (bool, bytes memory);
 }
 
-contract BalanceAnomalyTrap is ITrap {
-    address public constant target = 0xABcDEF1234567890abCDef1234567890AbcDeF12; // change 0xABcDEF1234567890abCDef1234567890AbcDeF12 to your own wallet address
-    uint256 public constant thresholdPercent = 1;
+contract DRDSER4Trap is ITrap {
+    uint256 public constant BLOCK_SAMPLE_SIZE = 10;
+    uint256 public constant COOLDOWN_BLOCKS = 33;
 
-    function collect() external override returns (bytes memory) {
-        return abi.encode(target.balance);
+    address public constant OPERATOR1 = 0x6a2EC0bDA342F4B4b8c401307696Ad73b430733c;
+    address public constant OPERATOR2 = 0x2aCEcCC0d79C54569aF451d354498bB80Ef6C41;
+
+    function collect() external view override returns (bytes memory) {
+        return abi.encode(OPERATOR1.balance, OPERATOR2.balance, block.number);
     }
 
-    function shouldRespond(bytes[] calldata data) external view override returns (bool, bytes memory) {
-        if (data.length < 2) return (false, "Insufficient data");
+    function shouldRespond(bytes calldata data) external pure override returns (bool, bytes memory) {
+        if (data.length < 2) return (false, "");
 
-        uint256 current = abi.decode(data[0], (uint256));
-        uint256 previous = abi.decode(data[1], (uint256));
+        (uint256 op1Current, uint256 op2Current, ) = abi.decode(data[0], (uint256, uint256, uint256));
+        (uint256 op1Prev, uint256 op2Prev, ) = abi.decode(data[1], (uint256, uint256, uint256));
 
-        uint256 diff = current > previous ? current - previous : previous - current;
-        uint256 percent = (diff * 100) / previous;
-
-        if (percent >= thresholdPercent) {
-            return (true, "");
-        }
-
-        return (false, "");
+        bool changed = (op1Current != op1Prev || op2Current != op2Prev);
+        return (changed, abi.encode("ALERT"));
     }
 }
+
 ```
 
-# Response Contract: LogAlertReceiver.sol
+# Response Contract: DRDSER4Trap.sol
 ```
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
@@ -79,11 +79,9 @@ contract LogAlertReceiver {
 
 # What It Solves 
 
-- Detects suspicious ETH flows from monitored addresses,
-
-- Provides an automated alerting mechanism,
-
-- Can integrate with automation logic (e.g., freezing funds, emergency DAO alerts).
+✅ Detects unauthorized ETH movements across multiple operator addresses
+✅ Emits automated alert upon detection
+✅ Can integrate with Drosera-compatible receivers to trigger defensive or governance mechanisms
 
 ---
 
@@ -91,56 +89,60 @@ contract LogAlertReceiver {
 
 1. ## _Deploy Contracts (e.g., via Foundry)_ 
 ```
-forge create src/BalanceAnomalyTrap.sol:BalanceAnomalyTrap \
+forge create src/DRDSER4Trap.sol:DRDSER4Trap \
   --rpc-url https://ethereum-hoodi-rpc.publicnode.com \
   --private-key 0x...
 ```
 ```
-forge create src/LogAlertReceiver.sol:LogAlertReceiver \
+forge create src/DRDSER4Trap.sol:DRDSER4Trap \
   --rpc-url https://ethereum-hoodi-rpc.publicnode.com \
   --private-key 0x...
 ```
 2. ## _Update drosera.toml_ 
 ```
-[traps.mytrap]
-path = "out/BalanceAnomalyTrap.sol/BalanceAnomalyTrap.json"
-response_contract = "<LogAlertReceiver address>"
-response_function = "logAnomaly(string)"
+[traps.helloworldtrap]
+path = "out/DRDSER4Trap.sol/DRDSER4Trap.json"  # Путь к ABI
+response_contract = "0x183D78491555cb69B68d2354F7373cc2632508C7"  # Адрес контракта ResponseProtocol
+response_function = "helloworld(string)"  # Имя функции
 ```
 3. ## _Apply changes_ 
 ```
 DROSERA_PRIVATE_KEY=0x... drosera apply
 ```
 
-<img width="547" height="354" alt="{F13A1A68-C0D0-4DFE-AF0B-03BA506B3899}" src="https://github.com/user-attachments/assets/e4ad73d9-5d32-4b65-9803-41c9872d3e4c" />
+https://github.com/oki1976/hello-world-trap/commit/ab3ec32855cab43ee9379d2ebf2c74af7e9bfdec#diff-b8b32ced1cfcfc6e3c3d2db056df4a892f6fc2f662ea6ead0d8a5e2671a60b9e
 
 
 # Testing the Trap 
 
-1. Send ETH to/from target address on Ethereum Hoodi testnet.
+1. Send ETH to/from either OPERATOR1 or OPERATOR2 on Ethereum Hoodi testnet
 
-2. Wait 1-3 blocks.
+2.  Wait 1–3 blocks
 
-3. Observe logs from Drosera operator:
+1.  Observe Drosera logs or dashboard:
 
-4. get ShouldRespond='true' in logs and Drosera dashboard
+   - Should show: ShouldRespond = true
+
+  - Trigger alert will be emitted
 ---
 
 # Extensions & Improvements 
 
-- Allow dynamic threshold setting via setter,
+- Add custom alert messages based on which operator changed
 
-- Track ERC-20 balances in addition to native ETH,
+- Monitor ERC-20 token balances alongside ETH
 
-- Chain multiple traps using a unified collector.
+- Add cooldown logic before re-alerting
+
+- Use more advanced anomaly models (e.g., % deviation)
 
 
 # Date & Author
 
-_First created: July 10, 2025_
+_First created: July 29, 2025_
 
-## Author: Danzel && Profit_Nodes 
-TG : _@Danzeliti_
+## Author: oktay && Profit_Nodes 
+TG : _@oktaj21_
 
-Discord: _danzel99_
+Discord: _oktay4814_
 
